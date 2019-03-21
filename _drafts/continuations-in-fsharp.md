@@ -1,16 +1,44 @@
 ---
 layout: post
-title: "Continuations in F#"
+title: "Continuations and call/cc in F#"
 ---
 
-https://stackoverflow.com/questions/3322540/how-and-why-does-the-haskell-cont-monad-work
-https://stackoverflow.com/questions/9050725/call-cc-implementation
-https://stackoverflow.com/questions/40052256/how-does-continuation-monad-really-work
-https://www.youtube.com/watch?v=2GfFlfToBCo
-http://matt.might.net/articles/programming-with-continuations--exceptions-backtracking-search-threads-generators-coroutines/
-http://www.fssnip.net/7c/title/Continuation-Monad-with-CallCC
+A continuation is an abstract concept of "the rest of a computation" from a certain point in time onward. This definition sounds pretty conceited, but it's easy to get an intuitive understanding of it, given an example. 
 
-A continuation is a concept representing "the rest of the computation". 
+Let's consider following expression (it's an easily approachable dialect of Lisp called [Racket](https://racket-lang.org/)):
+
+{% highlight racket %}
+(+ (* 3 4) 5) ;=> 17
+{% endhighlight %}
+
+One way to evaluate it would be to evaluate the two subexpressions, `(* 3 4)` and `5`, and then to apply the addition operation to them.
+
+Now let's assume we're evaluating the first one, `(* 3 4)`. We get the result, `12`. Now let's consider what to do next. We have evaluated a subexpression, what remains is the "rest of a computation". We can note it down as `(+ _ 5)`, where underscore signifies the hole to "plug in" the result we just calculated. We plug int the calculated value `12` there, for `(+ 12 5)`, and we arrive at result `17`.
+
+Conceptually, `(+ _ 5)` is a *continuation* of `(* 3 4)` in that context. Note that it's not the only way of splitting that expression into a partially done computation and its continuation. A continuation can be called "a future" of a computation - we can essentially freeze-frame a computation at any point in time, and we could refer to the yet-not-done part of it as the continuation.
+
+Up to this point, it's purely a conceptual distinction. In some languages however, this abstract concept can be directly reified into a concrete construct, a first-class continuation.
+
+{% highlight racket %}
+(define c #f)
+
+(+ (* 3 (call/cc
+         (lambda (k)
+          (set! *k* k)
+          k 4))) 5) ;=> 17
+
+(c 2) ;=> 11
+{% endhighlight %}
+
+What happens here is that instead of simply yielding `4`, we're capturing a continuation at that point using `call-with-current-continuation` (abbreviated `call/cc`). This makes the continuation, `(+ (* 3 _) 5)`, available as `k` in the body of the the lambda passed to `call/cc`. In a way, this turns the expression outside the `call/cc` block "inside out", and surfaces it as `k` inside the block.
+
+We can use this reified continuation however we see fit - here we're assigning it to a reference cell `c` and then calling the continuation, providing it the value `4`. This evaluates to the same result we've seen, `17`, but we're left with the captured continuation `c`. Applying it to `2` yields `11` - which is correct as this is the result of evaluating `(+ (* 3 2) 5)`.
+
+While F# (as well as the wider .NET framework) doesn't support first class continuations or call/cc, it does offer an elegant mechanism to model them in. Ordinarily, a practical attempt at modeling call/cc would require transforming the code into continuation-passing style by hand, which is a mechanical, but tedious process that leaves the code significantly harder to follow than the source version. In F#, much of that can be wished away by using a computation expression builder to hide the plumbing. 
+
+
+
+
 
 A bare-bones continuation builder can be defined as follows:
 
