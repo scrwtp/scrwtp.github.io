@@ -24,7 +24,7 @@ Up to this point, it's purely a conceptual distinction. In some languages howeve
 
 (+ (* 3 (call/cc
          (lambda (k)
-          (set! *k* k)
+          (set! c k)
           k 4))) 5) ;=> 17
 
 (c 2) ;=> 11
